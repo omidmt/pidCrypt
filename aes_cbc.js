@@ -78,6 +78,10 @@ if(typeof(pidCrypt) != 'undefined' &&
 /**
 * Initialize CBC for decryption from encrypted text (compatible with openssl).
 * see thread http://thedotnet.com/nntp/300307/showpost.aspx
+*
+* Bypassing openssl Salted__ prefix checking as encrypt is changed to support
+* timestamp in salt instead of this prefix
+*
 * @param  crypted: base64 encoded aes encrypted text
 * @param  passwd: String
 * @param  options {
@@ -93,8 +97,8 @@ if(typeof(pidCrypt) != 'undefined' &&
     if(!password)
       pidcrypt.appendError('pidCrypt.AES.CBC.initFromEncryption: Sorry, can not crypt or decrypt without password.\n');
     var ciphertext = pidCryptUtil.decodeBase64(crypted);
-    if(ciphertext.indexOf('Salted__') != 0)
-      pidcrypt.appendError('pidCrypt.AES.CBC.initFromCrypt: Sorry, unknown encryption method.\n');
+    //if(ciphertext.indexOf('Salted__') != 0)
+    //  pidcrypt.appendError('pidCrypt.AES.CBC.initFromCrypt: Sorry, unknown encryption method.\n');
     var salt = ciphertext.substr(8,8);//extract salt from crypted text
     options.salt = pidCryptUtil.convertToHex(salt);//salt is always hex string
     this.init(password,options);//call standard init
@@ -237,6 +241,11 @@ if(typeof(pidCrypt) != 'undefined' &&
 
 
 /**
+* The method is changd to replace Salted__ (1st 8 byte) to th timestamp,
+* so the key has creation date and can be expired and prevent reuse of
+* hash by man in middle (omid.mt@gmail.com)
+* The timestamp is encoded as unix timestamp to hex decoded and encoded as base64
+* The Bouncycastle decryptor is compatible and working as it just ignore the 1st 8 bytes
 * Encrypt a text using AES encryption in CBC mode of operation
 *  - see http://csrc.nist.gov/publications/nistpubs/800-38a/sp800-38a.pdf
 *
@@ -258,7 +267,8 @@ if(typeof(pidCrypt) != 'undefined' &&
       plaintext = pidCryptUtil.encodeUTF8(plaintext);
     pidcrypt.setParams({dataIn:plaintext, encryptIn: pidCryptUtil.toByteArray(plaintext)});
     var ciphertext = this.encryptRaw()
-    salt = 'Salted__' + pidCryptUtil.convertFromHex(p.salt);
+    //salt = 'Salted__' + pidCryptUtil.convertFromHex(p.salt);
+	salt = pidCryptUtil.encodeBase64(pidCryptUtil.convertFromHex((Date.now() / 1000 | 0).toString())) + pidCryptUtil.convertFromHex(p.salt);
     ciphertext = salt  + ciphertext;
     ciphertext = pidCryptUtil.encodeBase64(ciphertext);  // encode in base64
     pidcrypt.setParams({dataOut:ciphertext});
@@ -364,6 +374,9 @@ pidCrypt.AES.CBC.prototype.decryptRaw = function(byteArray) {
 *
 * one of the pidCrypt.AES.CBC init funtions must be called before execution
 *
+* Checking of OpenSSL Salted__ prefix bypassed as encrypt changed to support
+* timestamp as part of salt
+*
 * @param  ciphertext: base64 encoded and aes-cbc encrypted text
 *
 * @return           decrypted text as String
@@ -375,7 +388,8 @@ pidCrypt.AES.CBC.prototype.decryptRaw = function(byteArray) {
       pidcrypt.setParams({dataIn:ciphertext});
     if(!p.decryptIn) {
       var decryptIn = pidCryptUtil.decodeBase64(p.dataIn);
-      if(decryptIn.indexOf('Salted__') == 0) decryptIn = decryptIn.substr(16);
+      //if(decryptIn.indexOf('Salted__') == 0) decryptIn = decryptIn.substr(16);
+	  decryptIn = decryptIn.substr(16);
       pidcrypt.setParams({decryptIn: pidCryptUtil.toByteArray(decryptIn)});
     }
     var plaintext = this.decryptRaw();
