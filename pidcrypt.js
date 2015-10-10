@@ -90,7 +90,7 @@ function pidCrypt(){
   this.setDefaults = function(){
      this.params.nBits = 256;
   //salt should always be a Hex String e.g. AD0E76FF6535AD...
-     this.params.salt = byteArray2String(getRandomBytes(8)).convertToHex();
+     this.params.salt = pidCryptUtil.byteArray2String(getRandomBytes(8)).convertToHex();
      this.params.blockSize = 16;
      this.params.UTF8 = true;
      this.params.A0_PAD = true;
